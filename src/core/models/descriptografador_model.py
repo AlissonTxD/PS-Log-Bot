@@ -22,7 +22,11 @@ class Descriptografador:
 
         if descriptografado != None:
             logging.info("Senha válida")
-            return descriptografado
+            token, canal = descriptografado.split("canal")
+            return (token, int(canal))
+        else:
+            logging.info("Senha inválida")
+            raise ArquivoFaltando("Senha inválida")
 
     def __descriptografar(self, dados_bytes, chave=MAIN_KEY):
         chave_bytes = chave.encode()
@@ -34,3 +38,6 @@ class Descriptografador:
             )
 
         return resultado.decode("utf-8")
+    
+if __name__ == "__main__":
+    pass

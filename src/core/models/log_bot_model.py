@@ -1,139 +1,207 @@
 import discord
 from discord.ext import tasks
-import requests
-import discord
-from discord.ext import tasks, commands
-url = "https://api.battlemetrics.com/servers/36907723"
+import pygetwindow as gw
+import os
+from PIL import Image, ImageEnhance
+import mss
+import mss.tools
+import cv2
+import pytesseract
+import re
+import logging
 
+# Configurações globais de imagem
+IMG_FACTORS = (2.0, 0.5, 1.0, 2.5)
+LOG_SUBIMAGE_PATH = "temp/subimage.png"
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-ID_CANAL = 1235224811450405017
-alerta = False
-intents = discord.Intents.default()
-intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+class LogBotModel:
+    def __init__(self, config: dict):
+        self.event_counter = 0
+        self.reset_counter = 0
+        self.client = None
+        self.printer = None
+        self.events = []
+        self.token = None
+        self.CHANNEL_ID = None
+        self.cut_coords = None
+        self.testmode = config.get("testmode", False)
+        self.__load_config(config)
 
-ultima_contagem_jogadores = None
-variacao_jogadores = 0
-contagem_inicial_jogadores = None
-tempo_ultimo_reset = None
-ultima_mensagem = None
-qtd = 0
-danger = 0
+    # ----------------------- Início do Bot -----------------------
+    def run(self):
+        self._focus_in_window("ArkAscended")
 
-def start(token):
-    bot.run(token)
+        intents = discord.Intents.default()
+        intents.message_content = True
+        self.client = discord.Client(intents=intents)
 
-async def obter_info_servidor():
-    try:
-        resposta = requests.get(url)
-        resposta.raise_for_status()
-        dados = resposta.json()
-        nome_servidor = dados['data']['attributes']['name']
+        @self.client.event
+        async def on_ready():
+            logging.info(f"Login as {self.client.user}")
+            channel = self.client.get_channel(self.CHANNEL_ID)
+            try:
+                await channel.send("Log Bot Started!")
+            except Exception as e:
+                logging.error(f"Bot sem acesso ao canal: {e}")
+                return
+
+            if not self.printer.is_running():
+                self.printer.start()
+
+        @tasks.loop(seconds=30.0)
+        async def printer():
+            channel = self.client.get_channel(self.CHANNEL_ID)
+
+            # Captura a imagem e processa OCR
+            self.__generate_image_from_coords(self.cut_coords)
+            text = self.__read_img_ocr()
+
+            if text is None or not text.strip():
+                text = "No text detected"
+            
+            logging.info(f"Texto OCR: {text}")
+            is_new_event = self.__validate_log(text)
+
+            if self.testmode:
+                is_new_event = True
+                text = f"Test Event: {text}"
+
+            if is_new_event:
+                message = text
+                if self.event_counter > 5:
+                    message = f"@everyone {text}"
+                    self.event_counter = 0
+                elif self.event_counter >= 3:
+                    message = f"@here {text}"
+
+                try:
+                    await channel.send(f"{message}", file=discord.File(LOG_SUBIMAGE_PATH))
+                except Exception as e:
+                    logging.error(f"Erro enviando mensagem: {e}")
+
+                self.event_counter += 1
+                self.reset_counter = 20
+
+            if self.reset_counter >= 40:
+                self.event_counter = 0
+                self.reset_counter = 0
+
+            self.reset_counter += 1
+
+        self.printer = printer
+        self.client.run(self.token)
+
+    # ----------------------- OCR -----------------------
+    def __read_img_ocr(self):
         try:
-            contagem_jogadores = int(dados['data']['attributes']['players'])
-            status_server = dados['data']['attributes']['status']
-        except ValueError:
-            contagem_jogadores = None
-            status_server = "Sei la doido"
-        return nome_servidor, contagem_jogadores, status_server
-    except requests.RequestException as e:
-        print(f"Erro na requisição à API: {e}")
-        return None, None, None
-
-
-@bot.event
-async def on_ready():
-    global ultima_contagem_jogadores, variacao_jogadores, contagem_inicial_jogadores, tempo_ultimo_reset, nome_servidor
-    print(f'Logado como {bot.user}')
-
-    nome_servidor, contagem_inicial_jogadores, sv = await obter_info_servidor()
-    if contagem_inicial_jogadores is None:
-        print("Erro ao obter a contagem inicial de jogadores.")
-        return
-
-    ultima_contagem_jogadores = contagem_inicial_jogadores
-    variacao_jogadores = 0
-    tempo_ultimo_reset = bot.loop.time()
-
-    if not monitorar_servidor.is_running():
-        monitorar_servidor.start()
-
-
-@tasks.loop(minutes=1)
-async def monitorar_servidor():
-    global ultima_contagem_jogadores, variacao_jogadores, contagem_inicial_jogadores, tempo_ultimo_reset, ultima_mensagem, qtd, danger
-
-    canal = bot.get_channel(ID_CANAL)
-    nome_servidor, contagem_jogadores, status_sv = await obter_info_servidor()
-    tempo_atual = bot.loop.time()
-
-    if nome_servidor and contagem_jogadores is not None:
-        variacao = contagem_jogadores - ultima_contagem_jogadores
-        variacao_jogadores += variacao
-        ultima_contagem_jogadores = contagem_jogadores
-
-        mencao = ""
-        if alerta:
-            if 3 <= variacao_jogadores < 5:
-                mencao = "@here " * 3
-                danger = 1
-            elif variacao_jogadores >= 5:
-                mencao = "@everyone"
-                qtd += 1
-                if qtd >= 5:
-                    variacao_jogadores = 0
-                    danger = 0
-            if danger == 0:
-                simbolo = "+"
-            else:
-                simbolo = "-"
-        else:
-            simbolo = "+"
-
-        mensagem = (
-            "```Diff\n" + simbolo + f" Servidor: {nome_servidor}\n"
-            "" + simbolo +
-            f" Status do Server: {status_sv}\n"
-            "" + simbolo +
-            f" Quantidade de jogadores: {contagem_jogadores}/70\n"
-            "" + simbolo +
-            f" Variação de jogadores nos últimos 20 min: {variacao_jogadores}\n```"
-        )
-        if mencao:
-            mensagem = f"{mencao}\n{mensagem}"
-
-        try:
-            await ultima_mensagem.delete()
+            img = cv2.imread(LOG_SUBIMAGE_PATH)
+            text = pytesseract.image_to_string(img, config="--psm 6")
+            text = text.replace("\n", " ").replace("\r", "")
+            text = re.sub(r"\s+", " ", text)
+            return text
         except Exception as e:
-            print(f"Erro ao deletar a mensagem anterior: {e}")
+            logging.error(f"Erro no OCR: {e}")
+            return ""
 
-        ultima_mensagem = await canal.send(mensagem)
+    # ----------------------- Config -----------------------
+    def __load_config(self, config: dict):
+        try:
+            self.token = config.get("token")
+            self.CHANNEL_ID = config.get("channel_id")
+            self.cut_coords = config.get("cut_coords")
+            if not self.cut_coords or len(self.cut_coords) != 4:
+                raise ValueError("cut_coords inválido. Use (left, top, right, bottom).")
+        except Exception as e:
+            logging.error(f"Erro carregando config: {e}")
 
-        if tempo_atual - tempo_ultimo_reset >= 1200:  # 20 minutos em segundos
-            variacao_jogadores = contagem_jogadores - contagem_inicial_jogadores
-            tempo_ultimo_reset = tempo_atual
-            contagem_inicial_jogadores = contagem_jogadores
-            danger = 0
-    else:
-        print("Erro ao pegar dados do servidor")
+    # ----------------------- Captura e Processamento de Imagem -----------------------
+    def __generate_image_from_coords(self, cut_coords):
+        try:
+            os.makedirs("temp", exist_ok=True)
+
+            with mss.mss() as sct:
+                monitor_full = sct.monitors[1]  # monitor principal
+                left = monitor_full["left"] + cut_coords[0]
+                top = monitor_full["top"] + cut_coords[1]
+                width = cut_coords[2] - cut_coords[0]
+                height = cut_coords[3] - cut_coords[1]
+
+                if width <= 0 or height <= 0:
+                    raise ValueError("Coordenadas inválidas ou fora do monitor")
+
+                monitor = {"left": left, "top": top, "width": width, "height": height}
+                screenshot = sct.grab(monitor)
+
+                mss.tools.to_png(
+                    screenshot.rgb,
+                    screenshot.size,
+                    output=LOG_SUBIMAGE_PATH
+                )
+
+            # Ajustes de imagem para OCR
+            img = Image.open(LOG_SUBIMAGE_PATH).convert("RGB")
+            img = ImageEnhance.Contrast(img).enhance(IMG_FACTORS[0])
+            img = ImageEnhance.Color(img).enhance(IMG_FACTORS[1])
+            img = ImageEnhance.Brightness(img).enhance(IMG_FACTORS[2])
+            img = ImageEnhance.Sharpness(img).enhance(IMG_FACTORS[3])
+            img.save(LOG_SUBIMAGE_PATH)
+            img = img.resize((img.width * 2, img.height * 2), Image.LANCZOS)
+            img.save(LOG_SUBIMAGE_PATH)
+
+            logging.info(f"Imagem gerada em {LOG_SUBIMAGE_PATH}")
+
+        except Exception as e:
+            logging.error(f"Erro ao gerar imagem: {e}")
+
+    # ----------------------- Foco na Janela -----------------------
+    def _focus_in_window(self, window_name: str = "ArkAscended") -> None:
+        try:
+            windows = gw.getWindowsWithTitle(window_name)
+            if not windows:
+                logging.warning(f"Janela '{window_name}' não encontrada.")
+                return
+
+            window = windows[0]
+            if gw.getActiveWindow() != window:
+                window.activate()
+            else:
+                logging.info(f"Janela '{window_name}' já está ativa.")
+        except Exception as e:
+            logging.error(f"Erro ao focar a janela '{window_name}': {e}")
+
+    # ----------------------- Validação de Logs -----------------------
+    def __validate_log(self, text):
+        try:
+            match = re.match(r"Day (\d+), (\d{2}:\d{2}:\d{2}): (.+)", text)
+            if match:
+                day = match.group(1)
+                hour = match.group(2)
+                message = match.group(3)
+
+                ignore_words = ["Baby", "decay", "Karkinos"]
+
+                if ("Your" in message and ("destroyed" in message or "killed" in message)
+                        and not any(word in message for word in ignore_words)):
+                    event_id = f"{day} {hour}"
+                    if event_id not in self.events:
+                        self.events.append(event_id)
+                        logging.info(f"New Event: {text}")
+                        return True
+                    else:
+                        logging.warning(f"Event already registered: {text}")
+                        return False
+                else:
+                    logging.info(f"Event ignored: {text}")
+                    return False
+            else:
+                logging.warning(f"Invalid log format: {text}")
+                return False
+        except Exception as e:
+            logging.error(f"Erro validando log: {e}")
+            return False
 
 
-@bot.command(name="reset")
-async def reset_variacao(ctx):
-    global variacao_jogadores, danger
-    if ctx.channel.id == ID_CANAL:
-        variacao_jogadores = 0
-        danger = 0
-        await ctx.send(":thumbsup:")
-
-@bot.command(name="+1")
-async def adicional(ctx):
-    global variacao_jogadores
-    if ctx.channel.id == ID_CANAL:
-        variacao_jogadores += 1
-        await ctx.send(":thumbsup:")
-
-@bot.command(name="krz")
-async def adicional(ctx):
-    if ctx.channel.id == ID_CANAL:
-        await ctx.send("Your Tribemember krz - Lvl 168 was killed by a Wild Achatina - Lvl 5")
+# ----------------------- Uso -----------------------
+if __name__ == "__main__":
+    pass
