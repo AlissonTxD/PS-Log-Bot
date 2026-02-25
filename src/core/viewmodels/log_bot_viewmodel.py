@@ -1,4 +1,7 @@
+import logging
+
 from src.core.models.descriptografador_model import Descriptografador,ArquivoFaltando
+from src.core.models.json_model import JsonModel
 from src.core.models.log_bot_model import LogBotModel
 from discord.errors import LoginFailure
 
@@ -10,8 +13,10 @@ class LogBotViewModel:
         self.descriptografador = Descriptografador()
         self.cut_coords = None
         self.config = None
+        self.log_bot = None
+        self.thread_bot = None
 
-
+    #----------------------- Descriptografia e Configuração -----------------------
     def descriptografar(self):
         global response
         try:
@@ -28,9 +33,21 @@ class LogBotViewModel:
         except LoginFailure:
             return {"success": False, "erro": "Discord Key Invalida"}
         
+    #----------------------- Ativar Bot -----------------------
     def ativar_bot(self):
         self.config["cut_coords"] = self.cut_coords
-        logbot=LogBotModel(self.config)
-        thread_bot = threading.Thread(target=logbot.run,daemon=True)
-        thread_bot.start()
+        self.log_bot=LogBotModel(self.config)
+        self.thread_bot = threading.Thread(target=self.log_bot.run,daemon=True)
+        self.thread_bot.start()
         
+    #----------------------- Parar Bot -----------------------
+    def parar_bot(self):
+        if self.log_bot:
+            self.log_bot.stop()
+            self.log_bot = None
+            self.thread_bot = None
+            logging.info("Bot parado com sucesso.")
+
+    def get_json_config(self):
+        json_model = JsonModel()
+        return json_model.open_json()

@@ -13,8 +13,8 @@ def xor_criptografar(dados, chave):
 
     return bytes(resultado)
 
-
-dado = input("Digite o dado para criptografar: ")
+print("digite o dado para criptografar:")
+dado = input("Token + canal + Channel id")
 
 criptografado = xor_criptografar(dado, CHAVE)
 

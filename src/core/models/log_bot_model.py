@@ -15,6 +15,8 @@ IMG_FACTORS = (2.0, 0.5, 1.0, 2.5)
 LOG_SUBIMAGE_PATH = "temp/subimage.png"
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
+DELEY_BETWEEN_MESSAGES_SECONDS = 30
+
 class LogBotModel:
     def __init__(self, config: dict):
         self.event_counter = 0
@@ -25,7 +27,7 @@ class LogBotModel:
         self.token = None
         self.CHANNEL_ID = None
         self.cut_coords = None
-        self.testmode = config.get("testmode", False)
+        self.testmode = None
         self.__load_config(config)
 
     # ----------------------- Início do Bot -----------------------
@@ -53,7 +55,6 @@ class LogBotModel:
         async def printer():
             channel = self.client.get_channel(self.CHANNEL_ID)
 
-            # Captura a imagem e processa OCR
             self.__generate_image_from_coords(self.cut_coords)
             text = self.__read_img_ocr()
 
@@ -63,6 +64,7 @@ class LogBotModel:
             logging.info(f"Texto OCR: {text}")
             is_new_event = self.__validate_log(text)
 
+            logging.info(f"Test mode: {self.testmode}")
             if self.testmode:
                 is_new_event = True
                 text = f"Test Event: {text}"
@@ -110,6 +112,7 @@ class LogBotModel:
             self.token = config.get("token")
             self.CHANNEL_ID = config.get("channel_id")
             self.cut_coords = config.get("cut_coords")
+            self.testmode = config.get("testmode")
             if not self.cut_coords or len(self.cut_coords) != 4:
                 raise ValueError("cut_coords inválido. Use (left, top, right, bottom).")
         except Exception as e:
@@ -201,6 +204,20 @@ class LogBotModel:
             logging.error(f"Erro validando log: {e}")
             return False
 
+    def stop(self):
+        try:
+            print("Encerrando bot...")
+            if self.printer and self.printer.is_running():
+                self.printer.cancel()
+
+            if self.client:
+                import asyncio
+                asyncio.run_coroutine_threadsafe(
+                    self.client.close(),
+                    self.client.loop
+                )
+        except Exception as e:
+            print("Erro ao parar bot:", e)
 
 # ----------------------- Uso -----------------------
 if __name__ == "__main__":

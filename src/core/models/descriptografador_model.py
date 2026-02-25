@@ -13,7 +13,7 @@ class Descriptografador:
     def verificar_acesso(self):
         if not os.path.exists("key.enc"):
             logging.info("Arquivo de criptografia faltando")
-            raise ArquivoFaltando("Arquivo de criptografia faltando")
+            raise ArquivoFaltando("Missing encryption file, talk to your nearest Omigador.")
 
         with open("key.enc", "rb") as arquivo:
             conteudo = arquivo.read()
@@ -26,7 +26,7 @@ class Descriptografador:
             return (token, int(canal))
         else:
             logging.info("Senha inválida")
-            raise ArquivoFaltando("Senha inválida")
+            raise ArquivoFaltando("encrypted file is empty or corrupted, talk to your nearest Omigador.")
 
     def __descriptografar(self, dados_bytes, chave=MAIN_KEY):
         chave_bytes = chave.encode()

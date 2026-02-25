@@ -13,6 +13,10 @@
   <property name="windowTitle">
    <string>Ps - Log Bot</string>
   </property>
+  <property name="windowIcon">
+   <iconset>
+    <normaloff>../midia/ChatGPT Image 24 de fev. de 2026, 22_44_08.png</normaloff>../midia/ChatGPT Image 24 de fev. de 2026, 22_44_08.png</iconset>
+  </property>
   <property name="styleSheet">
    <string notr="true">background-color: rgb(15, 15, 15);</string>
   </property>
@@ -110,7 +114,7 @@
           <string/>
          </property>
          <property name="pixmap">
-          <pixmap>../Downloads/ChatGPT Image 24 de fev. de 2026, 23_24_12.png</pixmap>
+          <pixmap>../midia/ps_log_bot.png</pixmap>
          </property>
          <property name="scaledContents">
           <bool>true</bool>
@@ -531,7 +535,7 @@ color: #666666; /* Texto cinza escuro */
           <string/>
          </property>
          <property name="pixmap">
-          <pixmap>../Downloads/ChatGPT Image 24 de fev. de 2026, 22_44_08.png</pixmap>
+          <pixmap>../midia/ChatGPT Image 24 de fev. de 2026, 22_44_08.png</pixmap>
          </property>
          <property name="scaledContents">
           <bool>true</bool>
