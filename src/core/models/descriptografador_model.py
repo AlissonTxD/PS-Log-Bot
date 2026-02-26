@@ -1,7 +1,7 @@
 import os
 import logging
 
-MAIN_KEY = "test"
+MAIN_KEY = "primesurvivor"
 
 
 class ArquivoFaltando(Exception):

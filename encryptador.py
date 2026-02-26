@@ -1,4 +1,4 @@
-CHAVE = "test"
+CHAVE = "primesurvivor"
 
 def xor_criptografar(dados, chave):
     dados_bytes = dados.encode()
@@ -13,8 +13,8 @@ def xor_criptografar(dados, chave):
 
     return bytes(resultado)
 
-print("digite o dado para criptografar:")
-dado = input("Token + canal + Channel id")
+print("digite o dado para criptografar")
+dado = input("Token + canal + Channel id: ")
 
 criptografado = xor_criptografar(dado, CHAVE)
 

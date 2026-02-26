@@ -1,4 +1,5 @@
 import logging
+import os
 
 from src.core.models.descriptografador_model import Descriptografador,ArquivoFaltando
 from src.core.models.json_model import JsonModel
@@ -32,6 +33,8 @@ class LogBotViewModel:
             return {"success": False, "erro": str(e)}
         except LoginFailure:
             return {"success": False, "erro": "Discord Key Invalida"}
+        except Exception as e:
+            return {"success": False, "erro": f"Erro desconhecido: {str(e)}"}
         
     #----------------------- Ativar Bot -----------------------
     def ativar_bot(self):
@@ -51,3 +54,4 @@ class LogBotViewModel:
     def get_json_config(self):
         json_model = JsonModel()
         return json_model.open_json()
+    

@@ -1,11 +1,14 @@
+import os
+import sys
+
 from PyQt5.QtWidgets import QMainWindow, QPushButton, QCheckBox, QComboBox, QMessageBox
 from PyQt5 import uic
 import logging
-
 from src.core.viewmodels.log_bot_viewmodel import LogBotViewModel
+from src.core.models.utils import resource_path
 
 
-UI_PATH = "src/views/log_bot.ui"
+UI_PATH = resource_path("src/views/log_bot.ui")
 
 
 class ViewMain(QMainWindow):
@@ -25,7 +28,13 @@ class ViewMain(QMainWindow):
         self.btn_stop.setEnabled(False)
 
         # ----------------------- Carregando as resoluções -----------------------
-        dict_resolutions = self.log_view_model.get_json_config()
+        try:
+            dict_resolutions = self.log_view_model.get_json_config()
+        except Exception as e:
+            logging.error(f"Erro ao carregar configurações: {e}")
+            self.popup_error(f"Erro ao carregar configurações: {e}")
+            sys.exit()
+
         for resolution, coords in dict_resolutions.items():
             self.combobox.addItem(resolution, coords)
         
@@ -35,7 +44,11 @@ class ViewMain(QMainWindow):
         else:
             logging.error(f"Erro {resposta['erro']}")
             self.popup_error(f"Erro {resposta['erro']}")
-            exit()
+            sys.exit()
+        if not self.verificar_tesseract():
+            logging.error("Tesseract OCR não encontrado. Certifique-se de que o Tesseract está instalado e o caminho está correto.")
+            self.popup_error("tesseract not found. Please ensure Tesseract is installed and the path is correct.")
+            sys.exit()
 
     def popup_error(self, mensagem: str) -> None:
         """shows a popup with the given message.
@@ -62,3 +75,7 @@ class ViewMain(QMainWindow):
         self.btn_stop.setEnabled(False)
         print("Stop button clicked")
         self.log_view_model.parar_bot()
+    
+    def verificar_tesseract(self):
+        caminho = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        return os.path.exists(caminho)

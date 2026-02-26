@@ -15,6 +15,9 @@ IMG_FACTORS = (2.0, 0.5, 1.0, 2.5)
 LOG_SUBIMAGE_PATH = "temp/subimage.png"
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
+class tesseractfail(Exception):
+    pass
+
 DELEY_BETWEEN_MESSAGES_SECONDS = 30
 
 class LogBotModel:
@@ -104,6 +107,7 @@ class LogBotModel:
             return text
         except Exception as e:
             logging.error(f"Erro no OCR: {e}")
+            raise tesseractfail(f"OCR failed: {e}")
             return ""
 
     # ----------------------- Config -----------------------
