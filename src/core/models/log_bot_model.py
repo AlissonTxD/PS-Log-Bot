@@ -18,7 +18,7 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 class tesseractfail(Exception):
     pass
 
-DELEY_BETWEEN_MESSAGES_SECONDS = 30
+DELEY_BETWEEN_MESSAGES_SECONDS = 15
 
 class LogBotModel:
     def __init__(self, config: dict):
@@ -54,8 +54,9 @@ class LogBotModel:
             if not self.printer.is_running():
                 self.printer.start()
 
-        @tasks.loop(seconds=30.0)
+        @tasks.loop(seconds=DELEY_BETWEEN_MESSAGES_SECONDS)
         async def printer():
+            loops_for_minute = 60 // DELEY_BETWEEN_MESSAGES_SECONDS
             channel = self.client.get_channel(self.CHANNEL_ID)
 
             self.__generate_image_from_coords(self.cut_coords)
@@ -86,9 +87,9 @@ class LogBotModel:
                     logging.error(f"Erro enviando mensagem: {e}")
 
                 self.event_counter += 1
-                self.reset_counter = 20
+                self.reset_counter = loops_for_minute * 10
 
-            if self.reset_counter >= 40:
+            if self.reset_counter >= (loops_for_minute * 20):
                 self.event_counter = 0
                 self.reset_counter = 0
 
